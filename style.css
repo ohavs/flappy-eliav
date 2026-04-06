@@ -167,32 +167,58 @@ body {
   text-align: right;
 }
 
-/* Pipe (obstacle) */
-#block {
+/* ===== צינורות ===== */
+#pipe-top,
+#pipe-bottom {
   position: absolute;
-  width: 52px;
-  height: 100%;
-  top: 0;
-  background-image: url("https://pbs.twimg.com/media/BHyDnU5CQAE3oYu.png");
-  background-size: contain;
-  /* animation applied via JS */
+  width: 54px;
+  overflow: visible;
+  background: linear-gradient(
+    to right,
+    #2a7d10 0%,
+    #4ab82a 35%,
+    #6ee040 50%,
+    #4ab82a 65%,
+    #2a7d10 100%
+  );
+  box-shadow: inset -4px 0 6px rgba(0,0,0,.25);
+  /* animation set via JS */
 }
 
-/* Gap (hole) */
-#hole {
-  position: absolute;
-  width: 52px;
-  height: 150px;  /* updated via JS per mode */
-  top: 0;         /* updated via JS per pipe cycle */
-  background: rgba(135, 206, 235, 0.9);
-  border-left:  2px solid rgba(255,255,255,.5);
-  border-right: 2px solid rgba(255,255,255,.5);
-  /* animation applied via JS */
-}
+#pipe-top  { top: 0; }
+#pipe-bottom { bottom: 0; }
 
-#game.theme-night #hole {
-  background: rgba(5, 5, 32, 0.97);
-  border-color: rgba(80, 80, 200, .3);
+/* כובע הצינור — החלק הרחב בקצה פתוח */
+#pipe-top::after,
+#pipe-bottom::before {
+  content: '';
+  position: absolute;
+  left: -7px;
+  width: 68px;
+  height: 24px;
+  background: linear-gradient(
+    to right,
+    #2a7d10 0%,
+    #4ab82a 35%,
+    #6ee040 50%,
+    #4ab82a 65%,
+    #2a7d10 100%
+  );
+  border-radius: 3px;
+  box-shadow: 0 2px 6px rgba(0,0,0,.3);
+}
+#pipe-top::after    { bottom: 0; }
+#pipe-bottom::before { top: 0; }
+
+/* מצב לילה — צינורות סגולים */
+#game.theme-night #pipe-top,
+#game.theme-night #pipe-bottom {
+  background: linear-gradient(to right, #1a1060 0%, #3a28b0 35%, #5540d8 50%, #3a28b0 65%, #1a1060 100%);
+  box-shadow: inset -4px 0 6px rgba(0,0,0,.4);
+}
+#game.theme-night #pipe-top::after,
+#game.theme-night #pipe-bottom::before {
+  background: linear-gradient(to right, #1a1060 0%, #3a28b0 35%, #5540d8 50%, #3a28b0 65%, #1a1060 100%);
 }
 
 /* Character */
