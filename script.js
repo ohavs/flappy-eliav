@@ -1,33 +1,38 @@
 // ===== CONSTANTS =====
-const CHAR_LEFT   = 60;   // fixed x position of character
-const CHAR_WIDTH  = 46;   // slightly smaller than visual for fair hitbox
+const CHAR_LEFT   = 60;
+const CHAR_WIDTH  = 46;   // hitbox קצת קטן מהויזואל
 const CHAR_HEIGHT = 46;
 const BLOCK_WIDTH = 52;
-const HIT_PAD     = 5;    // collision forgiveness (px)
+const HIT_PAD     = 4;    // פיקסלים של סלחנות בפגיעה
+
+// פיזיקת Flappy Bird המקורית (60fps, 512px גובה)
+const BASE_HEIGHT   = 512;
+const BASE_GRAVITY  = 0.5;   // תאוצה לפריים
+const BASE_JUMP     = 9.0;   // מהירות קפיצה (כלפי מעלה)
+const BASE_TERMINAL = 10.0;  // מהירות נפילה מקסימלית
+
+const FIXED_STEP = 1000 / 60; // ~16.67ms — לולאת פיזיקה קבועה
 
 const MODES = {
   classic: {
     label: 'קלאסי', icon: '☀️',
-    speed: 2.2,       // pipe animation duration in seconds (higher = slower)
-    gapSize: 150,     // hole height in pixels
-    gravity: 0.35,    // velocity added per tick (10ms)
-    jumpPower: 8,     // upward velocity on tap
+    gapSize: 150,
+    pipeSpeed: 1.0,   // מכפיל מהירות הצינורות יחסית למקור
+    gravMult: 1.0,    // מכפיל כוח משיכה
     theme: ''
   },
   hard: {
     label: 'קשה', icon: '🔥',
-    speed: 1.4,
     gapSize: 115,
-    gravity: 0.48,
-    jumpPower: 8,
+    pipeSpeed: 1.7,
+    gravMult: 1.4,    // כוח משיכה כבד יותר
     theme: 'hard'
   },
   night: {
     label: 'לילה', icon: '🌙',
-    speed: 1.9,
     gapSize: 140,
-    gravity: 0.35,
-    jumpPower: 8,
+    pipeSpeed: 1.25,
+    gravMult: 1.0,
     theme: 'night'
   }
 };
@@ -37,11 +42,19 @@ let currentModeName = null;
 let currentMode     = null;
 let velocityY       = 0;
 let charTop         = 0;
+let rotation        = 0;
 let counter         = 0;
-let gameLoopId      = null;
+let rafId           = null;
+let lastTime        = null;
+let accumulator     = 0;
 let isGameRunning   = false;
 let gameH           = 0;
 let currentHoleTop  = 0;
+
+// ערכי פיזיקה מסוכלמים לגובה המסך הנוכחי
+let gravity    = 0;
+let jumpPower  = 0;
+let maxFallVel = 0;
 
 // ===== DOM =====
 const menuScreen   = document.getElementById('menu-screen');
@@ -56,7 +69,7 @@ const finalScoreEl = document.getElementById('final-score-display');
 const hsMenuEl     = document.getElementById('highscores-menu');
 const tapHintEl    = document.getElementById('tap-hint');
 
-// ===== HIGH SCORE =====
+// ===== שיאים =====
 function getHS(mode) {
   return parseInt(localStorage.getItem('hs_' + mode) || '0');
 }
@@ -68,10 +81,9 @@ function saveHS(mode, score) {
   return false;
 }
 
-// ===== SCREENS =====
+// ===== מסכים =====
 function showMenu() {
   stopLoop();
-  isGameRunning = false;
   menuScreen.classList.remove('hidden');
   gameDiv.classList.add('hidden');
   gameoverScr.classList.add('hidden');
@@ -92,41 +104,50 @@ function startGame(modeName) {
 
   gameH = gameDiv.offsetHeight;
 
-  // Inject responsive animation based on screen width
-  setAnimKeyframes(gameDiv.offsetWidth);
+  // סכלום פיזיקה לגובה המסך + רמת קושי
+  const scale = gameH / BASE_HEIGHT;
+  gravity    = BASE_GRAVITY  * scale * currentMode.gravMult;
+  jumpPower  = BASE_JUMP     * scale;
+  maxFallVel = BASE_TERMINAL * scale * currentMode.gravMult;
 
-  // Set hole size
+  // אנימציית צינורות — רספונסיבית לרוחב המסך
+  const gameW       = gameDiv.offsetWidth;
+  const pipeDur     = calcPipeDuration(gameW, currentMode.pipeSpeed);
+  setAnimKeyframes(gameW);
   holeEl.style.height = currentMode.gapSize + 'px';
 
-  // Restart pipe animation
   [blockEl, holeEl].forEach(el => {
     el.style.animation = 'none';
-    void el.offsetWidth; // force reflow to restart animation
-    el.style.animation = `moveBlock ${currentMode.speed}s infinite linear`;
+    void el.offsetWidth; // reflow — מאפס את האנימציה
+    el.style.animation = `moveBlock ${pipeDur.toFixed(2)}s infinite linear`;
   });
 
-  // Place hole at random starting position
+  // מיקום חור התחלתי
   currentHoleTop = randomHoleTop();
   holeEl.style.top = currentHoleTop + 'px';
 
-  // Reset character
+  // איפוס דמות
   charTop   = gameH * 0.25;
   velocityY = 0;
-  characterEl.style.top = charTop + 'px';
+  rotation  = 0;
+  characterEl.style.top       = charTop + 'px';
   characterEl.style.transform = '';
 
-  // Reset scores
+  // ניקוד
   counter = 0;
   liveScoreEl.textContent = 'ניקוד: 0';
   highScoreEl.textContent  = 'שיא: ' + getHS(modeName);
 
-  // Show tap hint then fade
+  // רמז הקשה
   tapHintEl.style.animation = 'none';
   void tapHintEl.offsetWidth;
   tapHintEl.style.animation = 'fadeHint 3s forwards';
 
+  // הפעל לולאת משחק
   isGameRunning = true;
-  gameLoopId = setInterval(tick, 10);
+  lastTime      = null;
+  accumulator   = 0;
+  rafId = requestAnimationFrame(gameLoop);
 }
 
 function restartGame() {
@@ -134,19 +155,22 @@ function restartGame() {
 }
 
 function stopLoop() {
-  clearInterval(gameLoopId);
-  gameLoopId = null;
+  isGameRunning = false;
+  if (rafId) {
+    cancelAnimationFrame(rafId);
+    rafId = null;
+  }
 }
 
-// Inject @keyframes with exact pixel start so animation matches screen width
+// הזרקת keyframes דינמיים לפי רוחב המסך
 function setAnimKeyframes(gameWidth) {
-  let styleEl = document.getElementById('dyn-anim');
-  if (!styleEl) {
-    styleEl = document.createElement('style');
-    styleEl.id = 'dyn-anim';
-    document.head.appendChild(styleEl);
+  let el = document.getElementById('dyn-anim');
+  if (!el) {
+    el = document.createElement('style');
+    el.id = 'dyn-anim';
+    document.head.appendChild(el);
   }
-  styleEl.textContent = `
+  el.textContent = `
     @keyframes moveBlock {
       from { left: ${gameWidth + 10}px; }
       to   { left: -62px; }
@@ -154,49 +178,79 @@ function setAnimKeyframes(gameWidth) {
   `;
 }
 
-function randomHoleTop() {
-  const margin = 55;
-  const min = margin;
-  const max = gameH - currentMode.gapSize - margin;
-  return Math.random() * (max - min) + min;
+// משך אנימציה — מבוסס על מהירות המקור (Flappy Bird: 288px ב-2.7 שניות)
+function calcPipeDuration(gameWidth, speedFactor) {
+  const origPxPerSec = (288 + 62) / 2.7; // ~130 px/s במקור
+  return (gameWidth + 72) / (origPxPerSec * speedFactor);
 }
 
-// ===== GAME LOOP =====
-function tick() {
-  // Velocity-based physics — smooth parabolic arc
-  velocityY += currentMode.gravity;
-  charTop   += velocityY;
+function randomHoleTop() {
+  const margin = 55;
+  return Math.random() * (gameH - currentMode.gapSize - margin * 2) + margin;
+}
 
-  // Ceiling clamp
+// ===== לולאת משחק — timestep קבוע 60fps =====
+function gameLoop(timestamp) {
+  if (!isGameRunning) return;
+  rafId = requestAnimationFrame(gameLoop);
+
+  if (lastTime === null) { lastTime = timestamp; return; }
+
+  const delta = Math.min(timestamp - lastTime, 50); // מניעת קפיצות ענק אחרי pause
+  lastTime = timestamp;
+  accumulator += delta;
+
+  // כמה צעדי פיזיקה צריך לבצע לתוך הפריים הזה
+  while (accumulator >= FIXED_STEP) {
+    physicsStep();
+    accumulator -= FIXED_STEP;
+  }
+
+  renderAndCheck();
+}
+
+// ===== פיזיקת Flappy Bird המדויקת =====
+function physicsStep() {
+  // כוח משיכה — מוגבל למהירות נפילה מקסימלית (terminal velocity)
+  velocityY = Math.min(velocityY + gravity, maxFallVel);
+  charTop  += velocityY;
+
+  // גג
   if (charTop < 0) {
     charTop   = 0;
     velocityY = 0;
   }
 
-  // Rotate character: nose-up when jumping, nose-down when falling
-  const angle = Math.max(-25, Math.min(45, velocityY * 4));
-  characterEl.style.top       = charTop + 'px';
-  characterEl.style.transform = `rotate(${angle}deg)`;
+  // סיבוב חלק (lerp) — כמו במקור:
+  // קפיצה → -25°, נפילה → עד 90°
+  const targetRot = velocityY < 0
+    ? -25
+    : Math.min(90, (velocityY / maxFallVel) * 90);
+  rotation += (targetRot - rotation) * 0.25;
+}
 
-  // Get pipe position from CSS animation
+function renderAndCheck() {
+  characterEl.style.top       = charTop + 'px';
+  characterEl.style.transform = `rotate(${rotation}deg)`;
+
+  // גילוי פגיעות
   const blockLeft = parseInt(getComputedStyle(blockEl).left);
 
-  // Hitbox with forgiveness padding
   const hitTop    = charTop + HIT_PAD;
   const hitBottom = charTop + CHAR_HEIGHT - HIT_PAD;
   const hitLeft   = CHAR_LEFT + HIT_PAD;
   const hitRight  = CHAR_LEFT + CHAR_WIDTH - HIT_PAD;
 
-  const hitFloor   = charTop + CHAR_HEIGHT >= gameH;
-  const horizHit   = blockLeft < hitRight && blockLeft + BLOCK_WIDTH > hitLeft;
-  const inHole     = hitTop >= currentHoleTop && hitBottom <= currentHoleTop + currentMode.gapSize;
+  const hitFloor = charTop + CHAR_HEIGHT >= gameH;
+  const horizHit = blockLeft < hitRight && blockLeft + BLOCK_WIDTH > hitLeft;
+  const inHole   = hitTop >= currentHoleTop && hitBottom <= currentHoleTop + currentMode.gapSize;
 
   if (hitFloor || (horizHit && !inHole)) {
     doGameOver();
   }
 }
 
-// Update hole position and score each time pipe loops
+// עדכון ניקוד + מיקום חור בכל מחזור צינור
 holeEl.addEventListener('animationiteration', () => {
   if (!isGameRunning) return;
   currentHoleTop = randomHoleTop();
@@ -207,13 +261,9 @@ holeEl.addEventListener('animationiteration', () => {
 
 function doGameOver() {
   stopLoop();
-  isGameRunning = false;
-
   const newRecord = saveHS(currentModeName, counter);
-
   gameDiv.classList.add('hidden');
   gameoverScr.classList.remove('hidden');
-
   finalScoreEl.innerHTML = `
     <div class="go-mode">${currentMode.icon} מצב ${currentMode.label}</div>
     <div class="go-points">ניקוד: <strong>${counter}</strong></div>
@@ -222,36 +272,28 @@ function doGameOver() {
   `;
 }
 
-// ===== CONTROLS =====
+// ===== שליטה =====
 function jump() {
   if (!isGameRunning) return;
-  velocityY = -currentMode.jumpPower;
+  velocityY = -jumpPower;
+  rotation  = -25; // נטייה מיידית כלפי מעלה בקפיצה — כמו במקור
 }
 
-// Touch (prevent scroll/zoom on mobile)
-gameDiv.addEventListener('touchstart', e => {
-  e.preventDefault();
-  jump();
-}, { passive: false });
-
-// Click (desktop)
+gameDiv.addEventListener('touchstart', e => { e.preventDefault(); jump(); }, { passive: false });
 gameDiv.addEventListener('click', jump);
-
-// Keyboard
 document.addEventListener('keydown', e => {
-  if (e.code === 'Space' || e.code === 'ArrowUp') {
-    e.preventDefault();
-    jump();
-  }
+  if (e.code === 'Space' || e.code === 'ArrowUp') { e.preventDefault(); jump(); }
 });
 
-// Recalculate on orientation change / resize
 window.addEventListener('resize', () => {
-  if (isGameRunning) {
-    gameH = gameDiv.offsetHeight;
-    setAnimKeyframes(gameDiv.offsetWidth);
-  }
+  if (!isGameRunning) return;
+  gameH = gameDiv.offsetHeight;
+  const scale = gameH / BASE_HEIGHT;
+  gravity    = BASE_GRAVITY  * scale * currentMode.gravMult;
+  jumpPower  = BASE_JUMP     * scale;
+  maxFallVel = BASE_TERMINAL * scale * currentMode.gravMult;
+  setAnimKeyframes(gameDiv.offsetWidth);
 });
 
-// ===== INIT =====
+// ===== אתחול =====
 showMenu();
