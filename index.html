@@ -1,32 +1,62 @@
 <!DOCTYPE html>
-<html lang="en" onclick="jump()">
-
+<html lang="he">
 <head>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Shantell+Sans&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
-    <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Flappy Bird</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Shantell+Sans&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Flappy Eliav</title>
 </head>
-
 <body>
-    <div id="game">
-        <div class="scores">
-            <p id="live-score"></p>
-            <p id="high-score"></p>
-        </div>
-        <div id="block"></div>
-        <div  class="text hide">
-            <h1>GAME OVER</h1>
-            <p class="score">you scored:</p>
-        </div>
-        <div id="hole"></div>
-        <div id="character"></div>
-    </div>
-    <script src="script.js"></script>
-</body>
 
+  <!-- MENU -->
+  <div id="menu-screen">
+    <h1>Flappy Eliav</h1>
+    <div id="highscores-menu"></div>
+    <p class="subtitle">בחר מצב משחק</p>
+    <div id="mode-buttons">
+      <button class="mode-btn classic-btn" onclick="startGame('classic')">
+        <div class="mode-icon">☀️</div>
+        <div class="mode-name">קלאסי</div>
+        <div class="mode-desc">קצב רגיל</div>
+      </button>
+      <button class="mode-btn hard-btn" onclick="startGame('hard')">
+        <div class="mode-icon">🔥</div>
+        <div class="mode-name">קשה</div>
+        <div class="mode-desc">מהיר ומאתגר</div>
+      </button>
+      <button class="mode-btn night-btn" onclick="startGame('night')">
+        <div class="mode-icon">🌙</div>
+        <div class="mode-name">לילה</div>
+        <div class="mode-desc">מצב לילה</div>
+      </button>
+    </div>
+  </div>
+
+  <!-- GAME -->
+  <div id="game" class="hidden">
+    <div id="scores">
+      <div id="live-score">ניקוד: 0</div>
+      <div id="high-score"></div>
+    </div>
+    <div id="block"></div>
+    <div id="hole"></div>
+    <div id="character"></div>
+    <div id="tap-hint">הקש לקפוץ ✋</div>
+  </div>
+
+  <!-- GAME OVER -->
+  <div id="gameover-screen" class="hidden">
+    <h1>משחק נגמר!</h1>
+    <div id="final-score-display"></div>
+    <div id="gameover-buttons">
+      <button class="go-btn menu-btn" onclick="showMenu()">תפריט</button>
+      <button class="go-btn play-again-btn" onclick="restartGame()">שחק שוב</button>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
 </html>
