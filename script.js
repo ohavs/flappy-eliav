@@ -1,38 +1,47 @@
 // ===== CONSTANTS =====
 const CHAR_LEFT   = 60;
-const CHAR_WIDTH  = 46;   // hitbox קצת קטן מהויזואל
+const CHAR_WIDTH  = 46;
 const CHAR_HEIGHT = 46;
 const BLOCK_WIDTH = 52;
-const HIT_PAD     = 4;    // פיקסלים של סלחנות בפגיעה
+const HIT_PAD     = 4;
 
-// פיזיקת Flappy Bird המקורית (60fps, 512px גובה)
-const BASE_HEIGHT   = 512;
-const BASE_GRAVITY  = 0.5;   // תאוצה לפריים
-const BASE_JUMP     = 9.0;   // מהירות קפיצה (כלפי מעלה)
-const BASE_TERMINAL = 10.0;  // מהירות נפילה מקסימלית
+const FIXED_STEP = 1000 / 60; // ~16.67ms — פיזיקה קבועה 60fps
 
-const FIXED_STEP = 1000 / 60; // ~16.67ms — לולאת פיזיקה קבועה
+// ערכי פיזיקה ב-px/frame (60fps), מכוונים ישירות — ללא סיכלום לגובה מסך.
+//
+// גובה קפיצה  = jumpPower² / (2 × gravity)
+// זמן קשת    = (jumpPower / gravity) × 2 פריימים
+//
+// classic:  0.42 / 8.5 → ~86px גובה, ~0.67s קשת   ← תחושת Flappy Bird קלאסית
+// hard:     0.60 / 8.5 → ~60px גובה, ~0.47s קשת   ← כבד ומהיר
+// night:    0.42 / 8.5 → ~86px גובה, ~0.67s קשת   ← זהה לקלאסי, מהירות בינונית
 
 const MODES = {
   classic: {
     label: 'קלאסי', icon: '☀️',
-    gapSize: 150,
-    pipeSpeed: 1.0,   // מכפיל מהירות הצינורות יחסית למקור
-    gravMult: 1.0,    // מכפיל כוח משיכה
+    gravity:    0.42,
+    jumpPower:  8.5,
+    maxFallVel: 9.0,
+    gapSize:    150,
+    pipeSpeed:  1.0,
     theme: ''
   },
   hard: {
     label: 'קשה', icon: '🔥',
-    gapSize: 115,
-    pipeSpeed: 1.7,
-    gravMult: 1.4,    // כוח משיכה כבד יותר
+    gravity:    0.60,
+    jumpPower:  8.5,
+    maxFallVel: 12.0,
+    gapSize:    115,
+    pipeSpeed:  1.7,
     theme: 'hard'
   },
   night: {
     label: 'לילה', icon: '🌙',
-    gapSize: 140,
-    pipeSpeed: 1.25,
-    gravMult: 1.0,
+    gravity:    0.42,
+    jumpPower:  8.5,
+    maxFallVel: 9.0,
+    gapSize:    140,
+    pipeSpeed:  1.25,
     theme: 'night'
   }
 };
@@ -51,7 +60,7 @@ let isGameRunning   = false;
 let gameH           = 0;
 let currentHoleTop  = 0;
 
-// ערכי פיזיקה מסוכלמים לגובה המסך הנוכחי
+// קיצורים לערכי הפיזיקה של המצב הפעיל
 let gravity    = 0;
 let jumpPower  = 0;
 let maxFallVel = 0;
@@ -104,15 +113,14 @@ function startGame(modeName) {
 
   gameH = gameDiv.offsetHeight;
 
-  // סכלום פיזיקה לגובה המסך + רמת קושי
-  const scale = gameH / BASE_HEIGHT;
-  gravity    = BASE_GRAVITY  * scale * currentMode.gravMult;
-  jumpPower  = BASE_JUMP     * scale;
-  maxFallVel = BASE_TERMINAL * scale * currentMode.gravMult;
+  // העתק ערכי פיזיקה מהמצב — ללא שינוי לפי גובה מסך
+  gravity    = currentMode.gravity;
+  jumpPower  = currentMode.jumpPower;
+  maxFallVel = currentMode.maxFallVel;
 
-  // אנימציית צינורות — רספונסיבית לרוחב המסך
-  const gameW       = gameDiv.offsetWidth;
-  const pipeDur     = calcPipeDuration(gameW, currentMode.pipeSpeed);
+  // אנימציית צינורות — מחושבת לפי רוחב המסך
+  const gameW   = gameDiv.offsetWidth;
+  const pipeDur = calcPipeDuration(gameW, currentMode.pipeSpeed);
   setAnimKeyframes(gameW);
   holeEl.style.height = currentMode.gapSize + 'px';
 
@@ -122,28 +130,23 @@ function startGame(modeName) {
     el.style.animation = `moveBlock ${pipeDur.toFixed(2)}s infinite linear`;
   });
 
-  // מיקום חור התחלתי
   currentHoleTop = randomHoleTop();
   holeEl.style.top = currentHoleTop + 'px';
 
-  // איפוס דמות
   charTop   = gameH * 0.25;
   velocityY = 0;
   rotation  = 0;
   characterEl.style.top       = charTop + 'px';
   characterEl.style.transform = '';
 
-  // ניקוד
   counter = 0;
   liveScoreEl.textContent = 'ניקוד: 0';
   highScoreEl.textContent  = 'שיא: ' + getHS(modeName);
 
-  // רמז הקשה
   tapHintEl.style.animation = 'none';
   void tapHintEl.offsetWidth;
   tapHintEl.style.animation = 'fadeHint 3s forwards';
 
-  // הפעל לולאת משחק
   isGameRunning = true;
   lastTime      = null;
   accumulator   = 0;
@@ -178,9 +181,9 @@ function setAnimKeyframes(gameWidth) {
   `;
 }
 
-// משך אנימציה — מבוסס על מהירות המקור (Flappy Bird: 288px ב-2.7 שניות)
+// מהירות צינורות: Flappy Bird מקורי = 288px ב-2.7s (~130px/s)
 function calcPipeDuration(gameWidth, speedFactor) {
-  const origPxPerSec = (288 + 62) / 2.7; // ~130 px/s במקור
+  const origPxPerSec = (288 + 62) / 2.7;
   return (gameWidth + 72) / (origPxPerSec * speedFactor);
 }
 
@@ -196,11 +199,10 @@ function gameLoop(timestamp) {
 
   if (lastTime === null) { lastTime = timestamp; return; }
 
-  const delta = Math.min(timestamp - lastTime, 50); // מניעת קפיצות ענק אחרי pause
+  const delta = Math.min(timestamp - lastTime, 50);
   lastTime = timestamp;
   accumulator += delta;
 
-  // כמה צעדי פיזיקה צריך לבצע לתוך הפריים הזה
   while (accumulator >= FIXED_STEP) {
     physicsStep();
     accumulator -= FIXED_STEP;
@@ -209,9 +211,9 @@ function gameLoop(timestamp) {
   renderAndCheck();
 }
 
-// ===== פיזיקת Flappy Bird המדויקת =====
+// ===== פיזיקה (מריץ 60 פעמים בשנייה) =====
 function physicsStep() {
-  // כוח משיכה — מוגבל למהירות נפילה מקסימלית (terminal velocity)
+  // כוח משיכה — מוגבל למהירות נפילה מקסימלית
   velocityY = Math.min(velocityY + gravity, maxFallVel);
   charTop  += velocityY;
 
@@ -221,8 +223,7 @@ function physicsStep() {
     velocityY = 0;
   }
 
-  // סיבוב חלק (lerp) — כמו במקור:
-  // קפיצה → -25°, נפילה → עד 90°
+  // סיבוב חלק (lerp):  קפיצה → -25°,  נפילה → עד 90°
   const targetRot = velocityY < 0
     ? -25
     : Math.min(90, (velocityY / maxFallVel) * 90);
@@ -233,7 +234,6 @@ function renderAndCheck() {
   characterEl.style.top       = charTop + 'px';
   characterEl.style.transform = `rotate(${rotation}deg)`;
 
-  // גילוי פגיעות
   const blockLeft = parseInt(getComputedStyle(blockEl).left);
 
   const hitTop    = charTop + HIT_PAD;
@@ -276,7 +276,7 @@ function doGameOver() {
 function jump() {
   if (!isGameRunning) return;
   velocityY = -jumpPower;
-  rotation  = -25; // נטייה מיידית כלפי מעלה בקפיצה — כמו במקור
+  rotation  = -25; // נטייה מיידית כלפי מעלה בקפיצה
 }
 
 gameDiv.addEventListener('touchstart', e => { e.preventDefault(); jump(); }, { passive: false });
@@ -288,11 +288,8 @@ document.addEventListener('keydown', e => {
 window.addEventListener('resize', () => {
   if (!isGameRunning) return;
   gameH = gameDiv.offsetHeight;
-  const scale = gameH / BASE_HEIGHT;
-  gravity    = BASE_GRAVITY  * scale * currentMode.gravMult;
-  jumpPower  = BASE_JUMP     * scale;
-  maxFallVel = BASE_TERMINAL * scale * currentMode.gravMult;
   setAnimKeyframes(gameDiv.offsetWidth);
+  // הפיזיקה נשארת קבועה — רק גובה המסך מתעדכן לחישוב רצפה וחור
 });
 
 // ===== אתחול =====
