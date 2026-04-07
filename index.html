@@ -32,6 +32,11 @@
         <div class="mode-name">לילה</div>
         <div class="mode-desc">מצב לילה</div>
       </button>
+      <button class="mode-btn mario-btn" onclick="startGame('mario')">
+        <div class="mode-icon">🏃</div>
+        <div class="mode-name">ריצה</div>
+        <div class="mode-desc">קפוץ מעל מכשולים</div>
+      </button>
     </div>
   </div>
 
@@ -41,8 +46,13 @@
       <div id="live-score">ניקוד: 0</div>
       <div id="high-score"></div>
     </div>
+    <!-- Flappy elements -->
     <div id="pipe-top"></div>
     <div id="pipe-bottom"></div>
+    <!-- Mario elements -->
+    <div id="ground"></div>
+    <div id="obstacle"></div>
+    <!-- Shared -->
     <div id="character"></div>
     <div id="tap-hint">הקש לקפוץ ✋</div>
   </div>

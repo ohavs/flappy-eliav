@@ -6,7 +6,7 @@
 
 body {
   overflow: hidden;
-  touch-action: none;          /* prevent scroll/zoom on mobile */
+  touch-action: none;
   -webkit-user-select: none;
   user-select: none;
   font-family: 'Shantell Sans', cursive;
@@ -19,14 +19,10 @@ body {
   position: fixed;
   inset: 0;
   width: 100%;
-  height: 100vh;          /* fallback */
+  height: 100vh;
 }
 @supports (height: 100dvh) {
-  #menu-screen,
-  #game,
-  #gameover-screen {
-    height: 100dvh;       /* excludes mobile browser chrome */
-  }
+  #menu-screen, #game, #gameover-screen { height: 100dvh; }
 }
 
 .hidden { display: none !important; }
@@ -49,10 +45,7 @@ body {
   text-shadow: 0 3px 8px rgba(0,0,0,.25);
 }
 
-.subtitle {
-  color: rgba(255,255,255,.9);
-  font-size: 1.05rem;
-}
+.subtitle { color: rgba(255,255,255,.9); font-size: 1.05rem; }
 
 #highscores-menu {
   display: flex;
@@ -63,13 +56,8 @@ body {
   padding: 8px 18px;
   border-radius: 14px;
 }
+.hs-item { font-size: .85rem; color: #fff; }
 
-.hs-item {
-  font-size: .85rem;
-  color: #fff;
-}
-
-/* Mode buttons */
 #mode-buttons {
   display: flex;
   gap: 14px;
@@ -82,7 +70,7 @@ body {
   flex-direction: column;
   align-items: center;
   padding: 16px 18px;
-  min-width: 100px;
+  min-width: 90px;
   min-height: 110px;
   border: none;
   border-radius: 18px;
@@ -92,15 +80,12 @@ body {
   transition: transform .12s, box-shadow .12s;
   -webkit-tap-highlight-color: transparent;
 }
-
-.mode-btn:active {
-  transform: scale(.92);
-  box-shadow: 0 2px 6px rgba(0,0,0,.2);
-}
+.mode-btn:active { transform: scale(.92); box-shadow: 0 2px 6px rgba(0,0,0,.2); }
 
 .classic-btn { background: #FFD700; color: #333; }
 .hard-btn    { background: #FF6B6B; color: #fff; }
 .night-btn   { background: #2d2f6e; color: #fff; }
+.mario-btn   { background: #e8483a; color: #fff; }
 
 .mode-icon { font-size: 2rem; }
 .mode-name { font-size: 1.05rem; font-weight: 700; margin-top: 6px; }
@@ -122,8 +107,6 @@ body {
   background-image: none;
   background: radial-gradient(ellipse at 50% 0%, #1a1a6e 0%, #050520 70%);
 }
-
-/* Stars for night mode */
 #game.theme-night::before {
   content: '';
   position: absolute;
@@ -138,16 +121,18 @@ body {
     radial-gradient(2px   2px   at 90% 11%,  rgba(255,255,255,.8) 0%, transparent 70%),
     radial-gradient(1px   1px   at  7% 46%,  rgba(255,255,255,.5) 0%, transparent 70%),
     radial-gradient(1.5px 1.5px at 53% 20%,  rgba(255,255,255,.6) 0%, transparent 70%),
-    radial-gradient(1px   1px   at 33% 52%,  rgba(255,255,255,.4) 0%, transparent 70%),
-    radial-gradient(1px   1px   at 76% 30%,  rgba(255,255,255,.5) 0%, transparent 70%),
-    radial-gradient(2px   2px   at 19% 18%,  rgba(255,255,255,.7) 0%, transparent 70%);
+    radial-gradient(1px   1px   at 33% 52%,  rgba(255,255,255,.4) 0%, transparent 70%);
   pointer-events: none;
   z-index: 0;
 }
 
-/* Hard theme — warmer, more intense */
-#game.theme-hard {
-  filter: saturate(1.4) brightness(1.05);
+/* Hard theme */
+#game.theme-hard { filter: saturate(1.4) brightness(1.05); }
+
+/* Mario theme — שמיים בהירים */
+#game.theme-mario {
+  background-image: none;
+  background: linear-gradient(180deg, #5db8f5 0%, #a8d8f0 60%, #c8eaff 100%);
 }
 
 /* Score HUD */
@@ -167,7 +152,7 @@ body {
   text-align: right;
 }
 
-/* ===== צינורות ===== */
+/* ===== צינורות (Flappy) ===== */
 #pipe-top,
 #pipe-bottom {
   position: absolute;
@@ -175,20 +160,13 @@ body {
   overflow: visible;
   background: linear-gradient(
     to right,
-    #2a7d10 0%,
-    #4ab82a 35%,
-    #6ee040 50%,
-    #4ab82a 65%,
-    #2a7d10 100%
+    #2a7d10 0%, #4ab82a 35%, #6ee040 50%, #4ab82a 65%, #2a7d10 100%
   );
   box-shadow: inset -4px 0 6px rgba(0,0,0,.25);
-  /* animation set via JS */
 }
-
-#pipe-top  { top: 0; }
+#pipe-top    { top: 0; }
 #pipe-bottom { bottom: 0; }
 
-/* כובע הצינור — החלק הרחב בקצה פתוח */
 #pipe-top::after,
 #pipe-bottom::before {
   content: '';
@@ -198,40 +176,108 @@ body {
   height: 24px;
   background: linear-gradient(
     to right,
-    #2a7d10 0%,
-    #4ab82a 35%,
-    #6ee040 50%,
-    #4ab82a 65%,
-    #2a7d10 100%
+    #2a7d10 0%, #4ab82a 35%, #6ee040 50%, #4ab82a 65%, #2a7d10 100%
   );
   border-radius: 3px;
   box-shadow: 0 2px 6px rgba(0,0,0,.3);
 }
-#pipe-top::after    { bottom: 0; }
+#pipe-top::after     { bottom: 0; }
 #pipe-bottom::before { top: 0; }
 
-/* מצב לילה — צינורות סגולים */
+/* Night pipes — סגולים */
 #game.theme-night #pipe-top,
 #game.theme-night #pipe-bottom {
   background: linear-gradient(to right, #1a1060 0%, #3a28b0 35%, #5540d8 50%, #3a28b0 65%, #1a1060 100%);
-  box-shadow: inset -4px 0 6px rgba(0,0,0,.4);
 }
 #game.theme-night #pipe-top::after,
 #game.theme-night #pipe-bottom::before {
   background: linear-gradient(to right, #1a1060 0%, #3a28b0 35%, #5540d8 50%, #3a28b0 65%, #1a1060 100%);
 }
 
-/* Character */
+/* ===== קרקע (Mario) ===== */
+#ground {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 72px;
+  z-index: 3;
+  background: linear-gradient(180deg, #5cb83a 0px, #5cb83a 14px, #8B5E3C 14px, #6d4726 100%);
+  overflow: hidden;
+}
+
+/* פסי דשא גוללים */
+#ground::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 200%;
+  height: 14px;
+  background: repeating-linear-gradient(
+    90deg,
+    #5cb83a 0px, #5cb83a 28px,
+    #4aa028 28px, #4aa028 56px
+  );
+  animation: scrollGrass 1.4s linear infinite;
+}
+
+@keyframes scrollGrass {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+/* ===== מכשול (Mario) ===== */
+#obstacle {
+  position: absolute;
+  width: 46px;
+  bottom: 72px; /* יושב על הקרקע */
+  z-index: 4;
+  background: linear-gradient(
+    to right,
+    #b84010 0%, #e05520 40%, #f07030 50%, #e05520 60%, #b84010 100%
+  );
+  border-radius: 6px 6px 0 0;
+  box-shadow: inset -3px 0 5px rgba(0,0,0,.3), 0 -2px 4px rgba(0,0,0,.2);
+}
+
+/* כובע מכשול */
+#obstacle::before {
+  content: '';
+  position: absolute;
+  top: -14px;
+  left: -6px;
+  width: 58px;
+  height: 14px;
+  background: linear-gradient(
+    to right,
+    #b84010 0%, #e05520 40%, #f07030 50%, #e05520 60%, #b84010 100%
+  );
+  border-radius: 4px 4px 0 0;
+  box-shadow: 0 -2px 4px rgba(0,0,0,.2);
+}
+
+/* ===== דמות ===== */
 #character {
   position: absolute;
-  left: 60px;         /* matches CHAR_LEFT in script.js */
-  width: 50px;
-  height: 50px;
+  left: 60px;
+  width: 60px;
+  height: 60px;
   background-image: url(eliav.png);
   background-size: contain;
   background-repeat: no-repeat;
+  background-position: center;
   transform-origin: center;
   z-index: 5;
+}
+
+/* אנימציית ריצה קלה */
+#character.running {
+  animation: runBob 0.22s ease-in-out infinite alternate;
+}
+@keyframes runBob {
+  from { transform: translateY(0px) rotate(-4deg); }
+  to   { transform: translateY(-5px) rotate(4deg); }
 }
 
 /* Tap hint */
@@ -249,7 +295,6 @@ body {
   white-space: nowrap;
   z-index: 10;
 }
-
 @keyframes fadeHint {
   0%   { opacity: 1; }
   70%  { opacity: 1; }
@@ -268,36 +313,24 @@ body {
   padding: 24px;
   text-align: center;
 }
-
 #gameover-screen h1 {
   font-size: clamp(2rem, 9vw, 3.5rem);
   color: #FF6B6B;
   text-shadow: 0 2px 10px rgba(255,0,0,.4);
 }
-
-#final-score-display {
-  font-size: 1.2rem;
-  line-height: 2;
-}
-
-.go-mode   { font-size: 1.5rem; }
-.go-best   { opacity: .75; }
+#final-score-display { font-size: 1.2rem; line-height: 2; }
+.go-mode  { font-size: 1.5rem; }
+.go-best  { opacity: .75; }
 .new-record {
   color: #FFD700;
   font-size: 1.4rem;
   animation: pulse .6s ease-in-out infinite alternate;
 }
-
 @keyframes pulse {
   from { transform: scale(1); }
   to   { transform: scale(1.1); }
 }
-
-#gameover-buttons {
-  display: flex;
-  gap: 16px;
-}
-
+#gameover-buttons { display: flex; gap: 16px; }
 .go-btn {
   padding: 13px 26px;
   border: none;
@@ -309,7 +342,6 @@ body {
   transition: transform .12s;
   -webkit-tap-highlight-color: transparent;
 }
-
 .go-btn:active    { transform: scale(.92); }
 .menu-btn         { background: #666; color: #fff; }
 .play-again-btn   { background: #4CAF50; color: #fff; }
