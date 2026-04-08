@@ -35,7 +35,7 @@
       <button class="mode-btn mario-btn" onclick="startGame('mario')">
         <div class="mode-icon">🏃</div>
         <div class="mode-name">ריצה</div>
-        <div class="mode-desc">קפוץ מעל מכשולים</div>
+        <div class="mode-desc">10 שלבים · כוחות · כפיפה</div>
       </button>
     </div>
   </div>
@@ -47,6 +47,7 @@
       <div id="high-score"></div>
       <div id="coin-score" class="hidden">🪙 0</div>
     </div>
+    <div id="powerup-status" class="hidden"></div>
     <!-- Flappy elements -->
     <div id="pipe-top"></div>
     <div id="pipe-bottom"></div>
@@ -55,11 +56,13 @@
     <div id="obstacle"></div>
     <div id="obstacle2"></div>
     <div id="coin-wrap" class="hidden"><div id="coin">🪙</div></div>
+    <div id="powerup-wrap" class="hidden"><div id="powerup"></div></div>
     <div id="level-banner"></div>
     <div id="jump-dots"><span id="jd1"></span><span id="jd2"></span></div>
     <!-- Shared -->
     <div id="character"></div>
     <div id="tap-hint">הקש לקפוץ ✋</div>
+    <button id="crouch-btn" class="hidden">⬇</button>
   </div>
 
   <!-- GAME OVER -->
