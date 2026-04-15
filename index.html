@@ -37,6 +37,11 @@
         <div class="mode-name">ריצה</div>
         <div class="mode-desc">10 שלבים · 3 חיים · קומבו</div>
       </button>
+      <button class="mode-btn arcade-btn" onclick="startGame('arcade')">
+        <div class="mode-icon">🕹️</div>
+        <div class="mode-name">ארקייד</div>
+        <div class="mode-desc">5 שלבים · פלטפורמר · D-pad</div>
+      </button>
     </div>
   </div>
 
@@ -69,6 +74,28 @@
     <div id="character"></div>
     <div id="tap-hint">הקש לקפוץ ✋</div>
     <button id="crouch-btn" class="hidden">⬇</button>
+  </div>
+
+  <!-- ARCADE SCREEN -->
+  <div id="arcade-screen" class="hidden">
+    <div id="arcade-wrapper">
+      <canvas id="arcade-canvas"></canvas>
+      <div id="dpad">
+        <div class="dpad-col">
+          <button class="dpad-btn" id="btn-up">▲</button>
+          <div class="dpad-mid">
+            <button class="dpad-btn" id="btn-left">◄</button>
+            <div class="dpad-center"></div>
+            <button class="dpad-btn" id="btn-right">►</button>
+          </div>
+          <button class="dpad-btn" id="btn-down">▼</button>
+        </div>
+      </div>
+      <div id="arcade-actions">
+        <button class="arc-btn" id="btn-b">כפוף</button>
+        <button class="arc-btn" id="btn-a">קפץ</button>
+      </div>
+    </div>
   </div>
 
   <!-- GAME OVER -->
