@@ -160,7 +160,7 @@ function startGame(modeName){
     gameDiv.classList.add("hidden");
     document.getElementById("arcade-screen").classList.remove("hidden");
     arcadeLives=3; arcadeScore=0; arcadeLevelIdx=0;
-    if(!arcadeCanvas) initArcade();
+    if(!arcadeCanvas) initArcade(); else resizeArcadeWrapper();
     beginArcadeLevel(0);
     return;
   }
@@ -818,6 +818,14 @@ var ARC_LEVELS=[
   }
 ];
 
+function resizeArcadeWrapper(){
+  var wrapper=document.getElementById('arcade-wrapper');
+  if(!wrapper) return;
+  var sw=window.innerWidth, sh=window.innerHeight;
+  wrapper.style.width=sh+'px'; wrapper.style.height=sw+'px';
+  wrapper.style.top=((sh-sw)/2)+'px'; wrapper.style.left=((sw-sh)/2)+'px';
+}
+
 function initArcade(){
   arcadeCanvas=document.getElementById('arcade-canvas');
   arcadeCtx=arcadeCanvas.getContext('2d');
@@ -825,13 +833,82 @@ function initArcade(){
   arcadeFaceImg=new Image();
   arcadeFaceImg.src='maor.png';
   arcadeFaceImg.onload=function(){ arcadeImgOk=true; };
-  setupDpad();
+  resizeArcadeWrapper();
+  setupJoystick();
+  setupArcButtons();
+  window.addEventListener('resize', resizeArcadeWrapper);
 }
 
-function setupDpad(){
-  var map={'btn-up':'jump','btn-left':'left','btn-right':'right','btn-down':'crouch','btn-a':'jump','btn-b':'crouch'};
-  Object.keys(map).forEach(function(id){
-    var k=map[id], el=document.getElementById(id);
+// Virtual joystick: dy maps to left/right (rotation-aware)
+var joyTouchId=null, joyCX=0, joyCY=0;
+var JOY_R=44, JOY_DEAD=14;
+
+function setupJoystick(){
+  var outer=document.getElementById('joy-outer');
+  var inner=document.getElementById('joy-inner');
+  if(!outer) return;
+
+  function joyStart(e){
+    e.preventDefault(); e.stopPropagation();
+    var t=e.changedTouches[0];
+    joyTouchId=t.identifier;
+    var rect=outer.getBoundingClientRect();
+    joyCX=rect.left+rect.width/2; joyCY=rect.top+rect.height/2;
+    joyMove(t.clientX, t.clientY, inner);
+  }
+  function joyEnd(e){
+    e.preventDefault();
+    for(var i=0;i<e.changedTouches.length;i++){
+      if(e.changedTouches[i].identifier===joyTouchId){
+        joyTouchId=null; aKeys.left=false; aKeys.right=false;
+        inner.style.transform='translate(-50%,-50%)'; break;
+      }
+    }
+  }
+  function joyMoveEvt(e){
+    e.preventDefault();
+    for(var i=0;i<e.changedTouches.length;i++){
+      if(e.changedTouches[i].identifier===joyTouchId){
+        joyMove(e.changedTouches[i].clientX, e.changedTouches[i].clientY, inner); break;
+      }
+    }
+  }
+  outer.addEventListener('touchstart', joyStart, {passive:false});
+  outer.addEventListener('touchmove', joyMoveEvt, {passive:false});
+  outer.addEventListener('touchend', joyEnd, {passive:false});
+  outer.addEventListener('touchcancel', joyEnd, {passive:false});
+  // Mouse fallback for desktop testing
+  var mouseDown=false;
+  outer.addEventListener('mousedown',function(e){
+    mouseDown=true;
+    var rect=outer.getBoundingClientRect();
+    joyCX=rect.left+rect.width/2; joyCY=rect.top+rect.height/2;
+    joyMove(e.clientX,e.clientY,inner);
+  });
+  document.addEventListener('mousemove',function(e){
+    if(mouseDown&&arcadeRunning) joyMove(e.clientX,e.clientY,inner);
+  });
+  document.addEventListener('mouseup',function(){
+    if(mouseDown){ mouseDown=false; aKeys.left=false; aKeys.right=false; inner.style.transform='translate(-50%,-50%)'; }
+  });
+}
+
+function joyMove(tx, ty, inner){
+  // dy<0 = portrait-UP = game RIGHT; dy>0 = portrait-DOWN = game LEFT
+  var dx=tx-joyCX, dy=ty-joyCY;
+  var dist=Math.sqrt(dx*dx+dy*dy);
+  var clamped=Math.min(dist,JOY_R);
+  var angle=Math.atan2(dy,dx);
+  var kx=Math.cos(angle)*clamped, ky=Math.sin(angle)*clamped;
+  inner.style.transform='translate(calc(-50% + '+kx+'px), calc(-50% + '+ky+'px))';
+  aKeys.right=dy<-JOY_DEAD;
+  aKeys.left=dy>JOY_DEAD;
+}
+
+function setupArcButtons(){
+  var btnMap={'btn-a':'jump','btn-b':'crouch'};
+  Object.keys(btnMap).forEach(function(id){
+    var k=btnMap[id], el=document.getElementById(id);
     if(!el) return;
     el.addEventListener('touchstart',function(e){e.preventDefault();e.stopPropagation();aKeys[k]=true;},{passive:false});
     el.addEventListener('touchend',function(e){e.preventDefault();e.stopPropagation();aKeys[k]=false;},{passive:false});
@@ -876,7 +953,7 @@ function arcLoop(ts){
 }
 
 function arcStep(){
-  var charH=arc.crouching?AC_CH:AC_H;
+  // Physics always uses AC_H so arc.y never teleports on crouch toggle
   var spd=arc.crouching?AC_SPD*0.55:AC_SPD;
   if(aKeys.left) arc.vx=-spd;
   else if(aKeys.right) arc.vx=spd;
@@ -893,16 +970,15 @@ function arcStep(){
   if(arc.x<0) arc.x=0;
   if(arc.x+AC_W>AC_LVLW) arc.x=AC_LVLW-AC_W;
 
-  charH=arc.crouching?AC_CH:AC_H;
+  // Platform collision always uses full height (no y-jump on crouch)
   arc.onGround=false;
-
   for(var i=0;i<arcPlats.length;i++){
     var p=arcPlats[i];
-    if(arcRect(arc.x,arc.y,AC_W,charH,p.x,p.y,p.w,p.h)){
-      var oT=(arc.y+charH)-p.y, oB=p.y+p.h-arc.y;
+    if(arcRect(arc.x,arc.y,AC_W,AC_H,p.x,p.y,p.w,p.h)){
+      var oT=(arc.y+AC_H)-p.y, oB=p.y+p.h-arc.y;
       var oL=(arc.x+AC_W)-p.x, oR=p.x+p.w-arc.x;
       var mo=Math.min(oT,oB,oL,oR);
-      if(mo===oT&&arc.vy>=0){ arc.y=p.y-charH; arc.vy=0; arc.onGround=true; }
+      if(mo===oT&&arc.vy>=0){ arc.y=p.y-AC_H; arc.vy=0; arc.onGround=true; }
       else if(mo===oB&&arc.vy<0){ arc.y=p.y+p.h; arc.vy=0; }
       else if(mo===oL&&arc.vx>0){ arc.x=p.x-AC_W; arc.vx=0; }
       else if(mo===oR&&arc.vx<0){ arc.x=p.x+p.w; arc.vx=0; }
@@ -912,14 +988,20 @@ function arcStep(){
   if(arc.y>AH+80){ arcHit(); return; }
   if(arc.invincible>0) arc.invincible--;
 
+  // For hazards: when crouching, effective top shifts DOWN (char squishes from top)
+  // effTop = arc.y + (AC_H - AC_CH) when crouching, so effBottom = arc.y + AC_H always
+  var effOff=arc.crouching?(AC_H-AC_CH):0;
+  var effH=arc.crouching?AC_CH:AC_H;
+
   for(var i=0;i<arcSpikes.length;i++){
     var s=arcSpikes[i];
-    if(arcRect(arc.x+4,arc.y+4,AC_W-8,charH-4,s.x,s.y,s.w,s.h)){ arcHit(); return; }
+    if(arcRect(arc.x+4,arc.y+effOff+4,AC_W-8,effH-4,s.x,s.y,s.w,s.h)){ arcHit(); return; }
   }
 
   for(var i=0;i<arcBars.length;i++){
     var b=arcBars[i];
-    if(arcRect(arc.x+2,arc.y,AC_W-4,charH,b.x,b.y,b.w,b.h)){
+    // Barrier only blocks if effective top is inside it (crouching shifts top below barrier bottom)
+    if(arcRect(arc.x+2,arc.y+effOff,AC_W-4,effH,b.x,b.y,b.w,b.h)){
       if(arc.x+AC_W/2<b.x+b.w/2){ arc.x=b.x-AC_W-2; } else { arc.x=b.x+b.w+2; }
       arc.vx=0;
     }
@@ -928,11 +1010,11 @@ function arcStep(){
   if(arc.invincible===0){
     for(var i=0;i<arcEnems.length;i++){
       var e=arcEnems[i];
-      if(arcRect(arc.x+4,arc.y+4,AC_W-8,charH-8,e.x,e.y,e.w,e.h)){ arcHit(); return; }
+      if(arcRect(arc.x+4,arc.y+effOff+4,AC_W-8,effH-8,e.x,e.y,e.w,e.h)){ arcHit(); return; }
     }
   }
 
-  if(arcRect(arc.x,arc.y,AC_W,charH,arcGoal.x-20,arcGoal.y-55,50,55)){ arcLevelDone(); return; }
+  if(arcRect(arc.x,arc.y+effOff,AC_W,effH,arcGoal.x-20,arcGoal.y-55,50,55)){ arcLevelDone(); return; }
 
   for(var i=0;i<arcEnems.length;i++){
     var e=arcEnems[i];
@@ -1046,17 +1128,18 @@ function arcDraw(){
     ctx.beginPath(); ctx.moveTo(ex+ed*3,ey-11); ctx.lineTo(ex+ed*12,ey-9); ctx.stroke();
   }
 
-  // Character
-  var charH=arc.crouching?AC_CH:AC_H;
+  // Character — draw bottom-aligned, squish to 60% when crouching (no y-glitch)
+  var drawH=arc.crouching?Math.round(AC_H*0.6):AC_H;
+  var drawY=arc.y+AC_H-drawH; // always bottom-aligned to arc.y+AC_H
   var flash=arc.invincible>0&&Math.floor(arc.invincible/5)%2===1;
   if(flash) ctx.globalAlpha=0.25;
   if(arcadeImgOk&&arcadeFaceImg){
     var bob2=arc.onGround&&!arc.crouching?Math.sin(Date.now()*0.012)*2:0;
-    ctx.drawImage(arcadeFaceImg,arc.x,arc.y+bob2,AC_W,charH);
+    ctx.drawImage(arcadeFaceImg,arc.x,drawY+bob2,AC_W,drawH);
   } else {
-    ctx.fillStyle='#4fc3f7'; ctx.fillRect(arc.x,arc.y,AC_W,charH);
-    ctx.fillStyle='#fff'; ctx.fillRect(arc.x+8,arc.y+8,9,9); ctx.fillRect(arc.x+AC_W-17,arc.y+8,9,9);
-    ctx.fillStyle='#111'; ctx.fillRect(arc.x+11,arc.y+11,4,4); ctx.fillRect(arc.x+AC_W-14,arc.y+11,4,4);
+    ctx.fillStyle='#4fc3f7'; ctx.fillRect(arc.x,drawY,AC_W,drawH);
+    ctx.fillStyle='#fff'; ctx.fillRect(arc.x+8,drawY+8,9,9); ctx.fillRect(arc.x+AC_W-17,drawY+8,9,9);
+    ctx.fillStyle='#111'; ctx.fillRect(arc.x+11,drawY+11,4,4); ctx.fillRect(arc.x+AC_W-14,drawY+11,4,4);
   }
   ctx.globalAlpha=1;
   ctx.restore();
