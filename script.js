@@ -160,7 +160,7 @@ function startGame(modeName){
     gameDiv.classList.add("hidden");
     document.getElementById("arcade-screen").classList.remove("hidden");
     arcadeLives=3; arcadeScore=0; arcadeLevelIdx=0;
-    if(!arcadeCanvas) initArcade(); else resizeArcadeWrapper();
+    if(!arcadeCanvas) initArcade(); else resizeArcade();
     beginArcadeLevel(0);
     return;
   }
@@ -818,28 +818,30 @@ var ARC_LEVELS=[
   }
 ];
 
-function resizeArcadeWrapper(){
-  var wrapper=document.getElementById('arcade-wrapper');
-  if(!wrapper) return;
+var arcScale=1, arcOX=0, arcOY=0;
+
+function resizeArcade(){
+  if(!arcadeCanvas) return;
   var sw=window.innerWidth, sh=window.innerHeight;
-  wrapper.style.width=sh+'px'; wrapper.style.height=sw+'px';
-  wrapper.style.top=((sh-sw)/2)+'px'; wrapper.style.left=((sw-sh)/2)+'px';
+  arcadeCanvas.width=sw; arcadeCanvas.height=sh;
+  arcScale=Math.min(sw/AW, sh/AH);
+  arcOX=(sw-AW*arcScale)/2;
+  arcOY=(sh-AH*arcScale)/2;
 }
 
 function initArcade(){
   arcadeCanvas=document.getElementById('arcade-canvas');
   arcadeCtx=arcadeCanvas.getContext('2d');
-  arcadeCanvas.width=AW; arcadeCanvas.height=AH;
   arcadeFaceImg=new Image();
   arcadeFaceImg.src='maor.png';
   arcadeFaceImg.onload=function(){ arcadeImgOk=true; };
-  resizeArcadeWrapper();
+  resizeArcade();
   setupJoystick();
   setupArcButtons();
-  window.addEventListener('resize', resizeArcadeWrapper);
+  window.addEventListener('resize', resizeArcade);
 }
 
-// Virtual joystick: dy maps to left/right (rotation-aware)
+// Virtual joystick
 var joyTouchId=null, joyCX=0, joyCY=0;
 var JOY_R=44, JOY_DEAD=14;
 
@@ -894,15 +896,14 @@ function setupJoystick(){
 }
 
 function joyMove(tx, ty, inner){
-  // dy<0 = portrait-UP = game RIGHT; dy>0 = portrait-DOWN = game LEFT
   var dx=tx-joyCX, dy=ty-joyCY;
   var dist=Math.sqrt(dx*dx+dy*dy);
   var clamped=Math.min(dist,JOY_R);
   var angle=Math.atan2(dy,dx);
   var kx=Math.cos(angle)*clamped, ky=Math.sin(angle)*clamped;
   inner.style.transform='translate(calc(-50% + '+kx+'px), calc(-50% + '+ky+'px))';
-  aKeys.right=dy<-JOY_DEAD;
-  aKeys.left=dy>JOY_DEAD;
+  aKeys.left=dx<-JOY_DEAD;
+  aKeys.right=dx>JOY_DEAD;
 }
 
 function setupArcButtons(){
@@ -1072,6 +1073,12 @@ function showArcBanner(name){
 
 function arcDraw(){
   var ctx=arcadeCtx, lv=ARC_LEVELS[arcadeLevelIdx];
+  // Black letterbox fill
+  ctx.fillStyle='#000'; ctx.fillRect(0,0,arcadeCanvas.width,arcadeCanvas.height);
+  // Scale game to fill screen (letterbox)
+  ctx.save();
+  ctx.translate(arcOX,arcOY); ctx.scale(arcScale,arcScale);
+  ctx.beginPath(); ctx.rect(0,0,AW,AH); ctx.clip();
   var grad=ctx.createLinearGradient(0,0,0,AH);
   var bg=lv.bg;
   for(var i=0;i<bg.length;i++) grad.addColorStop(i/(bg.length-1),bg[i]);
@@ -1159,6 +1166,7 @@ function arcDraw(){
   ctx.fillStyle='rgba(255,255,255,.2)'; ctx.fillRect(10,AH-12,pw,5);
   ctx.fillStyle='#FFD700'; ctx.fillRect(10,AH-12,pw*Math.min(1,(arc.x+AC_W/2)/AC_LVLW),5);
   arcDrawBanner(ctx);
+  ctx.restore(); // scale wrapper
 }
 
 function arcDrawStar(ctx,cx,cy,r,pts){
